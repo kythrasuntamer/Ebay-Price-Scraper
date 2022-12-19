@@ -1,5 +1,3 @@
-nes (46 sloc)  2.09 KB
-
 import scrapy
 import mysql.connector
 import smtplib
@@ -57,12 +55,4 @@ class EbayPriceSpider(scrapy.Spider):
         # Set the email subject and message
         subject = f'Price Alert: Item is now ${price}'
         message = f'The price of the item has fallen
-Footer
-© 2022 GitHub, Inc.
-Footer navigation
-Terms
-Privacy
-Security
-Status
-Docs
-Contact GitHub
+
