@@ -1,18 +1,35 @@
 import requests
 from bs4 import BeautifulSoup
 
-# Specify the URL of the eBay page you want to scrape
-url = 'https://www.ebay.com/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw=gtx+4090&_sacat=0'
+def scrape_ebay_prices(url):
+    # Send an HTTP request to the URL
+    try:
+        response = requests.get(url)
+        # If the response is successful, no Exception will be raised
+        response.raise_for_status()
+    except Exception as e:
+        # An exception is raised, return None
+        print(f'There was a problem accessing the URL: {e}')
+        return None
+    
+    # Parse the HTML content
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Find all elements containing a price
+    price_elements = soup.find_all('span', {'class': 's-item__price'})
+    
+    # Extract the price text from each element and return it in a list
+    if price_elements:
+        prices = [element.text for element in price_elements]
+        return prices
+    else:
+        # Return an empty list if no elements were found
+        return []
 
-# Make a request to the page
-page = requests.get(url)
+url = 'INSERT URL HERE' 
+prices = scrape_ebay_prices(url)
 
-# Create a BeautifulSoup object to parse the HTML of the page
-soup = BeautifulSoup(page.content, 'html.parser')
-
-# Find all the elements on the page with the class "s-item__price"
-prices = soup.find_all(class_='s-item__price')
-
-# Print the text content of each element
-for price in prices:
-  print(price.text)
+if prices:
+    print(f'The prices are {prices}')
+else:
+    print('Could not find any prices')
