@@ -7,64 +7,40 @@ import certifi
 import logging
 from datetime import datetime
 
-# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# List of user agents
 user_agents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36 Edg/94.0.992.31'
 ]
 
-def scrape_ebay_prices(url, retries=3, timeout=60):
-    delay = 5  # Initial delay in seconds
-    for i in range(retries):
-        try:
-            # Randomly select a user agent
-            headers = {
-                'User-Agent': random.choice(user_agents),
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.google.com/',  # Add a referer header
-                'robots': 'noindex, nofollow'  # Ignore robots.txt
-            }
-            logging.info(f"Attempt {i + 1}: Fetching URL with headers: {headers}")
-            response = requests.get(url, headers=headers, timeout=timeout, verify=certifi.where(), stream=True)
+def fetch_url(url, headers, timeout=60):
+    try:
+        with requests.Session() as session:
+            session.headers.update(headers)
+            response = session.get(url, timeout=timeout, verify=certifi.where())
             response.raise_for_status()
-            break  # Break if the request was successful
-        except requests.exceptions.HTTPError as e:
-            logging.error(f'Attempt {i + 1}: HTTP error: {e}')
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Attempt {i + 1}: There was a problem accessing the URL: {e}')
-        
-        if i < retries - 1:  # If it's not the last retry, wait before retrying
+            return response.text
+    except requests.exceptions.RequestException as e:
+        logging.error(f'Error fetching URL: {e}')
+        return None
+
+def scrape_ebay_prices(url, headers, retries=3, timeout=60):
+    delay = 5
+    for i in range(retries):
+        text = fetch_url(url, headers, timeout)
+        if text:
+            break
+        if i < retries - 1:
             logging.info(f'Waiting for {delay:.2f} seconds before retrying...')
             time.sleep(delay)
-            delay *= 2  # Exponential backoff
+            delay *= 2
     else:
-        # If the loop exits normally (without break), return None indicating failure
         logging.error('All attempts to fetch the URL have failed.')
         return None
 
-    # Try decoding the response using multiple encodings
-    encodings = ['utf-8', 'iso-8859-1']
-    for encoding in encodings:
-        try:
-            text = ''
-            for chunk in response.iter_content(chunk_size=1024):
-                text += chunk.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
-    else:
-        logging.error('Failed to decode the response using any of the specified encodings.')
-        return None
-
     soup = BeautifulSoup(text, 'html.parser')
-
-    # Use a more specific CSS selector to target the price elements
     price_elements = soup.select('li.s-item .s-item__price')
 
     prices = []
@@ -77,24 +53,31 @@ def scrape_ebay_prices(url, retries=3, timeout=60):
         logging.info('No price elements found on the page.')
         return []
 
-def save_prices_to_csv(data, filename):
+def save_prices_to_csv(prices, filename):
     try:
         with open(filename, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["Name", "Price", "Capture Date and Time"])  # Write the header
-            for entry in data:
-                writer.writerow([entry.get('name', ''), entry.get('price', ''), datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+            writer.writerow(["Price"])  # Write the header
+            for price in prices:
+                writer.writerow([price])
         logging.info(f'Data saved to {filename}')
     except Exception as e:
         logging.error(f'Error saving to CSV: {e}')
 
 def main():
-    url = 'INSERT URL HERE'  # Replace with the actual eBay search URL
-    prices = scrape_ebay_prices(url)
+    url = 'insert URL here.'
+    headers = {
+        'User-Agent': random.choice(user_agents),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9'
+    }
 
-    if prices:
-        logging.info(f'The prices are {prices}')
-        save_prices_to_csv(prices, 'ebay_prices.csv')
+    data = scrape_ebay_prices(url, headers)
+
+    if data:
+        logging.info(f'Scraped {len(data)} prices from eBay')
+        save_prices_to_csv(data, 'ebay_prices.csv')
     else:
         logging.info('Could not find any prices')
 
