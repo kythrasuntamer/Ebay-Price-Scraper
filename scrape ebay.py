@@ -16,6 +16,7 @@ user_agents = [
 ]
 
 def fetch_url(url, headers, timeout=60):
+    """Fetches the content of a URL using requests."""
     try:
         with requests.Session() as session:
             session.headers.update(headers)
@@ -27,6 +28,7 @@ def fetch_url(url, headers, timeout=60):
         return None
 
 def scrape_ebay_prices(url, headers, retries=3, timeout=60):
+    """Scrapes prices from eBay search results."""
     delay = 5
     for i in range(retries):
         text = fetch_url(url, headers, timeout)
@@ -41,7 +43,7 @@ def scrape_ebay_prices(url, headers, retries=3, timeout=60):
         return None
 
     soup = BeautifulSoup(text, 'html.parser')
-    price_elements = soup.select('li.s-item .s-item__price')
+    price_elements = soup.select('.s-item .s-item__info .s-item__price')
 
     prices = []
     if price_elements:
@@ -54,6 +56,7 @@ def scrape_ebay_prices(url, headers, retries=3, timeout=60):
         return []
 
 def save_prices_to_csv(prices, filename):
+    """Saves prices to a CSV file."""
     try:
         with open(filename, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
