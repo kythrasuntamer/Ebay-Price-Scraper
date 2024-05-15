@@ -89,7 +89,7 @@ def save_prices_to_csv(prices, filename):
         logging.error(f'Error saving to CSV: {e}')
 
 def main():
-    url = 'https://www.ebay.com/sch/i.html?_nkw=14tb+drive&_sacat=0&_odkw=14tb+drive&_osacat=0'  # Replace with the actual eBay search URL
+    url = 'INSERT URL HERE'  # Replace with the actual eBay search URL
     prices = scrape_ebay_prices(url)
 
     if prices:
