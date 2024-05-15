@@ -77,16 +77,17 @@ def scrape_ebay_prices(url, retries=3, timeout=60):
         logging.info('No price elements found on the page.')
         return []
 
-def save_prices_to_csv(prices, filename):
+def save_prices_to_csv(data, filename):
     try:
-        with open(filename, mode='w', newline='') as file:
+        with open(filename, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["Price", "Capture Date and Time"])  # Write the header
-            for price in prices:
-                writer.writerow([price, datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
-        logging.info(f'Prices saved to {filename}')
+            writer.writerow(["Name", "Price", "Capture Date and Time"])  # Write the header
+            for entry in data:
+                writer.writerow([entry['name'], entry['price'], datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+        logging.info(f'Data saved to {filename}')
     except Exception as e:
         logging.error(f'Error saving to CSV: {e}')
+
 
 def main():
     url = 'INSERT URL HERE'  # Replace with the actual eBay search URL
