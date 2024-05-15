@@ -83,11 +83,10 @@ def save_prices_to_csv(data, filename):
             writer = csv.writer(file)
             writer.writerow(["Name", "Price", "Capture Date and Time"])  # Write the header
             for entry in data:
-                writer.writerow([entry['name'], entry['price'], datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+                writer.writerow([entry.get('name', ''), entry.get('price', ''), datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
         logging.info(f'Data saved to {filename}')
     except Exception as e:
         logging.error(f'Error saving to CSV: {e}')
-
 
 def main():
     url = 'INSERT URL HERE'  # Replace with the actual eBay search URL
