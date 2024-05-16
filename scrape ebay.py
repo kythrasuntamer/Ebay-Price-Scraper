@@ -24,11 +24,11 @@ def fetch_url(url, headers, timeout=60):
             response.raise_for_status()
             return response.text
     except requests.exceptions.RequestException as e:
-        logging.error(f'Error fetching URL: {e}')
+        logging.error(f'Error fetching URL {url}: {e}')
         return None
 
-def scrape_ebay_prices(url, headers, retries=3, timeout=60):
-    """Scrapes prices from eBay search results."""
+def scrape_ebay_data(url, headers, retries=3, timeout=60):
+    """Scrapes item titles, prices, and saves the time and date to the CSV file."""
     delay = 5
     for i in range(retries):
         text = fetch_url(url, headers, timeout)
@@ -39,36 +39,46 @@ def scrape_ebay_prices(url, headers, retries=3, timeout=60):
             time.sleep(delay)
             delay *= 2
     else:
-        logging.error('All attempts to fetch the URL have failed.')
+        logging.error(f'All attempts to fetch the URL {url} have failed.')
         return None
 
     soup = BeautifulSoup(text, 'html.parser')
-    price_elements = soup.select('.s-item .s-item__info .s-item__price')
+    items = soup.select('.s-item')
 
-    prices = []
-    if price_elements:
-        for element in price_elements:
-            price = element.text.strip()
-            prices.append(price)
-        return prices
+    data = []
+    if items:
+        for item in items:
+            title_element = item.select_one('.s-item__title')
+            price_element = item.select_one('.s-item__price')
+            if title_element and price_element:
+                title = title_element.text.strip()
+                price = price_element.text.strip()
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                data.append([title, price, timestamp])
+            else:
+                logging.warning(f'Skipping item on URL {url} due to missing data')
     else:
-        logging.info('No price elements found on the page.')
-        return []
+        logging.info(f'No items found on the page {url}.')
+    
+    return data
 
-def save_prices_to_csv(prices, filename):
-    """Saves prices to a CSV file."""
+def save_data_to_csv(data, filename):
+    """Saves item data to a CSV file."""
     try:
         with open(filename, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["Price"])  # Write the header
-            for price in prices:
-                writer.writerow([price])
+            writer.writerow(["Title", "Price", "Timestamp"])  # Write the header
+            for row in data:
+                if len(row) == 3:  # Ensure each row has title, price, and timestamp
+                    writer.writerow(row)
+                else:
+                    logging.warning(f'Skipping invalid data: {row}')
         logging.info(f'Data saved to {filename}')
     except Exception as e:
         logging.error(f'Error saving to CSV: {e}')
 
 def main():
-    url = 'insert URL here.'
+    url = 'https://www.ebay.com/sch/i.html?_nkw=14tb&_sacat=131553&_odkw=mybook+14tb&_osacat=131553'
     headers = {
         'User-Agent': random.choice(user_agents),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -76,13 +86,13 @@ def main():
         'Accept-Language': 'en-US,en;q=0.9'
     }
 
-    data = scrape_ebay_prices(url, headers)
+    data = scrape_ebay_data(url, headers)
 
     if data:
-        logging.info(f'Scraped {len(data)} prices from eBay')
-        save_prices_to_csv(data, 'ebay_prices.csv')
+        logging.info(f'Scraped {len(data)} items from eBay')
+        save_data_to_csv(data, 'ebay_data.csv')
     else:
-        logging.info('Could not find any prices')
+        logging.info('Could not find any items')
 
 if __name__ == '__main__':
     main()
