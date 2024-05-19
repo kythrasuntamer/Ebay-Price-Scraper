@@ -27,6 +27,14 @@ def fetch_url(url, headers, timeout=60):
         logging.error(f'Error fetching URL {url}: {e}')
         return None
 
+def extract_price(price_str):
+    """Extracts a single price from a price string that may be a range."""
+    try:
+        prices = [float(p.strip().replace('$', '').replace(',', '')) for p in price_str.split('to')]
+        return min(prices) if len(prices) > 1 else prices[0]
+    except ValueError:
+        return None
+
 def scrape_ebay_data(url, headers, retries=3, timeout=60):
     """Scrapes item titles, prices, and saves the time and date to the CSV file."""
     delay = 5
@@ -52,33 +60,38 @@ def scrape_ebay_data(url, headers, retries=3, timeout=60):
             price_element = item.select_one('.s-item__price')
             if title_element and price_element:
                 title = title_element.text.strip()
-                price = price_element.text.strip()
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                data.append([title, price, timestamp])
+                price = extract_price(price_element.text.strip())
+                if price is not None:  # Ensure price is valid before appending
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    data.append([title, price, timestamp])
+                else:
+                    logging.warning(f'Skipping item "{title}" on URL {url} due to invalid price')
             else:
                 logging.warning(f'Skipping item on URL {url} due to missing data')
     else:
         logging.info(f'No items found on the page {url}.')
+
+    # Sort data by price in descending order
+    data.sort(key=lambda x: x[1] if x[1] is not None else float('inf'), reverse=True)
     
     return data
 
 def save_data_to_csv(data, filename):
-    """Saves item data to a CSV file."""
+    """Appends item data to a CSV file."""
     try:
-        with open(filename, mode='w', newline='', encoding='utf-8') as file:
+        with open(filename, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["Title", "Price", "Timestamp"])  # Write the header
             for row in data:
                 if len(row) == 3:  # Ensure each row has title, price, and timestamp
                     writer.writerow(row)
                 else:
                     logging.warning(f'Skipping invalid data: {row}')
-        logging.info(f'Data saved to {filename}')
+        logging.info(f'Data appended to {filename}')
     except Exception as e:
-        logging.error(f'Error saving to CSV: {e}')
+        logging.error(f'Error appending to CSV: {e}')
 
 def main():
-    url = 'https://www.ebay.com/sch/i.html?_nkw=14tb&_sacat=131553&_odkw=mybook+14tb&_osacat=131553'
+    url = 'insert url here'
     headers = {
         'User-Agent': random.choice(user_agents),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -90,7 +103,7 @@ def main():
 
     if data:
         logging.info(f'Scraped {len(data)} items from eBay')
-        save_data_to_csv(data, 'ebay_data.csv')
+        save_data_to_csv(data, 'ebay_data_sorted.csv')
     else:
         logging.info('Could not find any items')
 
