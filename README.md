@@ -1,3 +1,5 @@
+Rudimentary eBay Price scraper. I've got plans to continue refining this into something much more useful. But it's free.
+
 USAGE:
 pip install -r requirements.txt
 
