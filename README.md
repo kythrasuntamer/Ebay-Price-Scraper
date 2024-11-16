@@ -1,17 +1,8 @@
-# Ebay-Price-Scraper
-This Will Scrape the price of Ebay Items.
+USAGE:
+pip install -r requirements.txt
 
-simply modify the url =  to whatever page you want to scrape.
+python eBay_scraper.py "Your Search Query" --output_file "output.csv" --delay 1 --max_pages 2
 
-and then simply
+EXAMPLE:python eBay_scraper.py "Nvidia RTX 3090 TI" --output_file "RTX3090_TI.csv" --delay 1 --max_pages 2
 
-pip install requests
-
-pip install beuatifulsoup4
-
-and then run it.
-
-there are a few scrapers in here that would have to be modified by you, some use SQL databases, some can alert you  
-
-Pip install scrapy for them.  Things are a work in progress at the moment.  So is the documentation. 
 
