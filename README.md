@@ -3,8 +3,5 @@ Rudimentary eBay Price scraper. I've got plans to continue refining this into so
 USAGE:
 pip install -r requirements.txt
 
-python eBay_scraper.py "Your Search Query" --output_file "output.csv" --delay 1 --max_pages 2
-
-EXAMPLE:python eBay_scraper.py "Nvidia RTX 3090 TI" --output_file "RTX3090_TI.csv" --delay 1 --max_pages 2
-
-
+python eBay_scraper.py "Your Search Query" --output_file "output.csv" --delay 1 --max_pages 2 -filter_keyword
+python eBayt.py "gaming laptop" --output_file "gaming_laptops.csv" --min_price 150 --max_pages 5 --filter_keywords "used" "refurbished"
