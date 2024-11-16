@@ -101,7 +101,7 @@ def scrape_page_with_selenium(driver, url):
     return page_results
 
 # Main function to search for an item, scrape eBay prices, and save to CSV using Selenium with stealth integration
-def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay=1, max_pages=1):
+def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay=1, max_pages=1, min_price=0, filter_keywords=[]):
     base_url = "https://www.ebay.com/sch/i.html?_nkw={}&_pgn={}"
     search_query_formatted = search_query.replace(' ', '+')
 
@@ -137,7 +137,17 @@ def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay
 
     driver.quit()
 
-    # Save the results to a CSV file
+    # Filter out items with 'Total Cost' below the specified min_price
+    results = [item for item in results if float(item['Total Cost'].replace('$', '').strip()) >= min_price]
+
+    # Filter out items that contain any of the specified filter keywords in the title
+    if filter_keywords:
+        results = [item for item in results if not any(keyword.lower() in item['Title'].lower() for keyword in filter_keywords)]
+
+    # Sort results by the 'Total Cost' field (convert to float for sorting)
+    results.sort(key=lambda x: float(x['Total Cost'].replace('$', '').strip()))
+
+    # Save the filtered and sorted results to a CSV file
     if results:
         with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
             fieldnames = ['Title', 'Price', 'Shipping Cost', 'Total Cost', 'Condition', 'Listing Type']
@@ -149,7 +159,7 @@ def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay
 
         logging.info(f"Data has been saved to {output_file}")
     else:
-        logging.warning("No data to save. Check 'page_source.html' for the page structure.")
+        logging.warning("No data to save after filtering. Check 'page_source.html' for the page structure or adjust the filter criteria.")
 
 # Main block to handle command-line arguments
 if __name__ == "__main__":
@@ -158,8 +168,10 @@ if __name__ == "__main__":
     parser.add_argument('--output_file', type=str, default='ebay_prices.csv', help='Output CSV file name (default: ebay_prices.csv)')
     parser.add_argument('--delay', type=float, default=1, help='Delay between requests in seconds (default: 1)')
     parser.add_argument('--max_pages', type=int, default=1, help='Number of pages to scrape (default: 1)')
+    parser.add_argument('--min_price', type=float, default=0, help='Minimum price threshold to filter results (default: 0)')
+    parser.add_argument('--filter_keywords', type=str, nargs='*', help='Keywords to filter out items by title (e.g., "used refurbished")', default=[])
 
     args = parser.parse_args()
 
     # Run the scraper with provided arguments
-    scrape_ebay_prices_to_csv(args.search_query, args.output_file, args.delay, args.max_pages)
+    scrape_ebay_prices_to_csv(args.search_query, args.output_file, args.delay, args.max_pages, args.min_price, args.filter_keywords)
