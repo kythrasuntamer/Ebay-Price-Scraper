@@ -1,8 +1,8 @@
-import csv
 import time
 import logging
 import argparse
 import random
+import sqlite3
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -12,6 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from selenium_stealth import stealth
+from datetime import datetime
 import os
 
 # Setup enhanced logging configuration
@@ -67,16 +68,18 @@ def scrape_page_with_selenium(driver, url):
         logging.warning("No items found on the page. The page structure may have changed.")
         return []
 
-    # Extract item details
+    # Extract item details with timestamp and URL
     page_results = []
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for item in items:
         title = item.find('div', class_='s-item__title')
         price = item.find('span', class_='s-item__price')
         shipping = item.find('span', class_='s-item__shipping')
         condition = item.find('span', class_='SECONDARY_INFO')
         listing_type = item.find('span', class_='s-item__purchase-options')
+        item_link = item.find('a', class_='s-item__link')
 
-        if title and hasattr(title, 'text') and price and hasattr(price, 'text'):
+        if title and hasattr(title, 'text') and price and hasattr(price, 'text') and item_link and 'href' in item_link.attrs:
             price_text = price.text.replace('$', '').replace(',', '').strip()
             price_value = float(price_text.split()[0]) if price_text.replace('.', '', 1).isdigit() else 0.0
 
@@ -95,13 +98,46 @@ def scrape_page_with_selenium(driver, url):
                 'Shipping Cost': f"${shipping_value:.2f}",
                 'Total Cost': f"${total_cost:.2f}",
                 'Condition': condition.text.strip() if condition else 'N/A',
-                'Listing Type': listing_type.text.strip() if listing_type else 'N/A'
+                'Listing Type': listing_type.text.strip() if listing_type else 'N/A',
+                'URL': item_link['href'],
+                'Timestamp': current_time
             })
 
     return page_results
 
-# Main function to search for an item, scrape eBay prices, and save to CSV using Selenium with stealth integration
-def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay=1, max_pages=1, min_price=0, filter_keywords=[]):
+# Function to save data to an SQLite database
+def save_to_sqlite(database_name, table_name, data):
+    conn = sqlite3.connect(database_name)
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist (using double quotes to escape the table name)
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS "{table_name}" (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            Title TEXT,
+            Price TEXT,
+            Shipping_Cost TEXT,
+            Total_Cost TEXT,
+            Condition TEXT,
+            Listing_Type TEXT,
+            URL TEXT,
+            Timestamp TEXT
+        )
+    ''')
+
+    # Insert data into table
+    for item in data:
+        cursor.execute(f'''
+            INSERT INTO "{table_name}" (Title, Price, Shipping_Cost, Total_Cost, Condition, Listing_Type, URL, Timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (item['Title'], item['Price'], item['Shipping Cost'], item['Total Cost'], item['Condition'], item['Listing Type'], item['URL'], item['Timestamp']))
+
+    conn.commit()
+    conn.close()
+    logging.info(f"Data has been saved to the '{table_name}' table in {database_name}.")
+
+# Main function to search for an item, scrape eBay prices, and save to an SQL database
+def scrape_ebay_prices_to_sqlite(search_query, database_name='ebay_prices.db', table_name='ebay_data', delay=1, max_pages=1, min_price=0, filter_keywords=[]):
     base_url = "https://www.ebay.com/sch/i.html?_nkw={}&_pgn={}"
     search_query_formatted = search_query.replace(' ', '+')
 
@@ -147,25 +183,18 @@ def scrape_ebay_prices_to_csv(search_query, output_file='ebay_prices.csv', delay
     # Sort results by the 'Total Cost' field (convert to float for sorting)
     results.sort(key=lambda x: float(x['Total Cost'].replace('$', '').strip()))
 
-    # Save the filtered and sorted results to a CSV file
+    # Save the filtered and sorted results to the SQLite database
     if results:
-        with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ['Title', 'Price', 'Shipping Cost', 'Total Cost', 'Condition', 'Listing Type']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-            writer.writeheader()
-            for result in results:
-                writer.writerow(result)
-
-        logging.info(f"Data has been saved to {output_file}")
+        save_to_sqlite(database_name, table_name, results)
     else:
         logging.warning("No data to save after filtering. Check 'page_source.html' for the page structure or adjust the filter criteria.")
 
 # Main block to handle command-line arguments
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Search eBay for an item and save details to a CSV file using Selenium with stealth integration.")
+    parser = argparse.ArgumentParser(description="Search eBay for an item and save details to an SQLite database using Selenium with stealth integration.")
     parser.add_argument('search_query', type=str, help='The search query for the item on eBay')
-    parser.add_argument('--output_file', type=str, default='ebay_prices.csv', help='Output CSV file name (default: ebay_prices.csv)')
+    parser.add_argument('--database_name', type=str, default='ebay_prices.db', help='SQLite database file name (default: ebay_prices.db)')
+    parser.add_argument('--table_name', type=str, default='ebay_data', help='Table name in the database (default: ebay_data)')
     parser.add_argument('--delay', type=float, default=1, help='Delay between requests in seconds (default: 1)')
     parser.add_argument('--max_pages', type=int, default=1, help='Number of pages to scrape (default: 1)')
     parser.add_argument('--min_price', type=float, default=0, help='Minimum price threshold to filter results (default: 0)')
@@ -174,4 +203,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Run the scraper with provided arguments
-    scrape_ebay_prices_to_csv(args.search_query, args.output_file, args.delay, args.max_pages, args.min_price, args.filter_keywords)
+    scrape_ebay_prices_to_sqlite(args.search_query, args.database_name, args.table_name, args.delay, args.max_pages, args.min_price, args.filter_keywords)
